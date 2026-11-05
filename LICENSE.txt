@@ -1,0 +1,3 @@
+Prototype source code generated for the requesting user. Third-party
+libraries and models retain their own licenses. Check all terms before
+enterprise distribution or deployment.

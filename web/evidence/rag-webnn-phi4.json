@@ -1,0 +1,50 @@
+{
+  "date": "2026-11-05T15:54:36.883Z",
+  "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0",
+  "realOllama": true,
+  "webnnEnabled": true,
+  "result": {
+    "answer": "Le budget total du projet Azur est de 48 275 euros, qui finance les ordinateurs et la formation des équipes [S1].",
+    "sources": [
+      {
+        "source_id": "S1",
+        "page": 2,
+        "text": "FINANCEMENT DU PROJET AZUR Le budget total du projet Azur est de 48 275 euros. Ce montant finance les ordinateurs et la formation des equipes."
+      },
+      {
+        "source_id": "S2",
+        "page": 1,
+        "text": "DOSSIER ENTIEREMENT FICTIF - NOVARA Le projet fictif Azur est pilote par la societe Novara a Lyon. Le projet commence le 12 mars 2031 et termine le 30 juin 2031."
+      },
+      {
+        "source_id": "S3",
+        "page": 3,
+        "text": "PROTECTION DES COMPTES Les salaries doivent activer une authentification a deux facteurs. Les sauvegardes sont effectuees chaque nuit."
+      }
+    ],
+    "mode": "rag-webnn-phi4",
+    "generation_stats": {
+      "load_seconds": 0.021,
+      "prompt_seconds": 0.025,
+      "generation_seconds": 0.727,
+      "prompt_tokens": 316,
+      "output_tokens": 33
+    },
+    "warning": null,
+    "elapsed_seconds": 0.806
+  },
+  "generationRequests": [
+    {
+      "question": "Quel est le budget total du projet Azur ?",
+      "chunk_ids": [
+        5,
+        4,
+        6
+      ]
+    }
+  ],
+  "cacheReloadPassed": true,
+  "externalRequests": [],
+  "pageErrors": [],
+  "screenshot": "evidence/rag-webnn-phi4.png"
+}

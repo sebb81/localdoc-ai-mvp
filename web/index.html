@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LocalDoc · RAG WebNN</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/style.css"></head>
+<body><main>
+  <header><div class="eyebrow">LOCALDOC AI · DOCUMENTS LOCAUX</div><h1>Vos documents.<br>Des réponses avec leurs sources.</h1>
+    <p class="lead">Importez un document, posez une question. La recherche utilise WebNN dans le navigateur ; Phi‑4 rédige la réponse en local avec Ollama.</p></header>
+  <div class="rag-layout">
+    <section class="library"><h2>Mes documents</h2>
+      <form id="upload"><label for="file">Ajouter un PDF, TXT ou Markdown</label><input id="file" type="file" accept=".pdf,.txt,.md" required><button id="uploadBtn">Importer le document</button></form>
+      <p id="uploadStatus" class="note" role="status">25 Mo maximum · les documents restent sur ce PC.</p><div id="docs"></div>
+    </section>
+    <section class="workspace"><h2 id="heading">Interroger un document</h2><p id="intro">Sélectionnez un document à gauche ou importez-en un nouveau.</p>
+      <div id="workspace" hidden>
+        <p id="meta" class="note"></p>
+        <div class="controls"><button id="prepare" class="secondary">Préparer la recherche WebNN</button><button id="open" class="secondary">Ouvrir le document</button><button id="delete" class="secondary">Supprimer</button></div>
+        <p id="indexStatus" role="status" class="note">La préparation se fait une seule fois, puis l’index est conservé dans ce navigateur.</p>
+        <form id="askForm"><label for="question"><strong>Votre question</strong></label><textarea id="question" required minlength="3" maxlength="1000" placeholder="Ex. Quel est le budget prévu ? Où ce stage a-t-il eu lieu ?"></textarea><button id="askBtn">Poser la question</button></form>
+        <p id="status" role="status"></p><h2>Réponse</h2><div id="reply" aria-live="polite">La réponse apparaîtra ici, avec des références [S1], [S2]…</div><p id="warning" class="error"></p>
+        <div class="sources-heading"><h2>Passages utilisés</h2><span id="timing" class="note"></span></div><div id="sources"></div>
+      </div>
+    </section>
+  </div>
+  <details class="options"><summary>Options de recherche et informations</summary>
+    <label for="provider">Moteur de recherche <select id="provider"><option value="gpu">WebNN · préférence GPU</option><option value="cpu">WebNN · préférence CPU</option><option value="npu">WebNN · préférence NPU</option><option value="wasm">WASM · CPU du navigateur</option></select></label>
+    <p class="note">Le modèle de recherche MiniLM est principalement anglophone : vérifiez la pertinence des passages en français. La recherche associe les vecteurs du navigateur et les mots du document. Les passages longs sont couverts par fenêtres, sans tronquer leur fin.</p>
+    <p class="note">ONNX Runtime peut combiner WebNN et du calcul CPU. La puce réelle n’est pas identifiée. La génération avec Phi‑4 reste exécutée par Ollama ; cette version n’est pas entièrement dans le navigateur.</p>
+  </details>
+  <footer><span>LocalDoc RAG WebNN</span><span id="health">Connexion au service local…</span></footer>
+</main><script type="module" src="/rag.js"></script></body></html>
