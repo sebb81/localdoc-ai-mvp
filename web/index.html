@@ -3,7 +3,7 @@
 <title>LocalDoc · RAG WebNN</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/style.css"></head>
 <body><main>
   <header><div class="eyebrow">LOCALDOC AI · DOCUMENTS LOCAUX</div><h1>Vos documents.<br>Des réponses avec leurs sources.</h1>
-    <p class="lead">Importez un document, posez une question. La recherche utilise WebNN dans le navigateur ; Phi‑4 rédige la réponse en local avec Ollama.</p></header>
+    <p class="lead">Importez un document, posez une question. La recherche utilise WebNN dans le navigateur ; Phi‑4 rédige la réponse en local avec llama.cpp.</p></header>
   <div class="rag-layout">
     <section class="library"><h2>Mes documents</h2>
       <form id="upload"><label for="file">Ajouter un PDF, TXT ou Markdown</label><input id="file" type="file" accept=".pdf,.txt,.md" required><button id="uploadBtn">Importer le document</button></form>
@@ -23,7 +23,7 @@
   <details class="options"><summary>Options de recherche et informations</summary>
     <label for="provider">Moteur de recherche <select id="provider"><option value="gpu">WebNN · préférence GPU</option><option value="cpu">WebNN · préférence CPU</option><option value="npu">WebNN · préférence NPU</option><option value="wasm">WASM · CPU du navigateur</option></select></label>
     <p class="note">Le modèle de recherche MiniLM est principalement anglophone : vérifiez la pertinence des passages en français. La recherche associe les vecteurs du navigateur et les mots du document. Les passages longs sont couverts par fenêtres, sans tronquer leur fin.</p>
-    <p class="note">ONNX Runtime peut combiner WebNN et du calcul CPU. La puce réelle n’est pas identifiée. La génération avec Phi‑4 reste exécutée par Ollama ; cette version n’est pas entièrement dans le navigateur.</p>
+    <p class="note">ONNX Runtime peut combiner WebNN et du calcul CPU. La puce réelle n’est pas identifiée. La génération avec Phi‑4 reste exécutée par llama.cpp ; cette version n’est pas entièrement dans le navigateur.</p>
   </details>
   <footer><span>LocalDoc RAG WebNN</span><span id="health">Connexion au service local…</span></footer>
 </main><script type="module" src="/rag.js"></script></body></html>

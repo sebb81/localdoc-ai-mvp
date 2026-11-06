@@ -22,12 +22,12 @@ def test_import_retrieve_generate_with_verified_sources(client, monkeypatch):
     hits = client.post(f'/api/webnn/documents/{doc_id}/lexical', json={'question': 'Quel est le budget de Novara ?'}).json()
     assert hits[0]['id'] == chunks[0]['id']
     def generate(endpoint, payload, timeout=120):
-        assert endpoint == '/api/chat'
+        assert endpoint == '/v1/chat/completions'
         assert payload['model'] == 'phi4'
         assert '48275 euros' in payload['messages'][1]['content']
         assert '[S1] PAGE 1' in payload['messages'][1]['content']
-        return {'message': {'content': 'Le budget est de 48275 euros [S1].'}}
-    monkeypatch.setattr(engine, 'ollama_request', generate)
+        return {'choices': [{'message': {'content': 'Le budget est de 48275 euros [S1].'}}]}
+    monkeypatch.setattr(engine, 'llama_request', generate)
     result = client.post(f'/api/webnn/documents/{doc_id}/generate', json={
         'question': 'Quel est le budget ?', 'chunk_ids': [hits[0]['id']]})
     assert result.status_code == 200
@@ -42,7 +42,7 @@ def test_reject_passage_from_other_document(client, monkeypatch):
     other_chunk = client.get(f'/api/webnn/documents/{other["id"]}/chunks').json()['chunks'][0]['id']
     def unexpected(*args, **kwargs):
         pytest.fail('No model call allowed with foreign source IDs')
-    monkeypatch.setattr(engine, 'ollama_request', unexpected)
+    monkeypatch.setattr(engine, 'llama_request', unexpected)
     result = client.post(f'/api/webnn/documents/{first["id"]}/generate', json={
         'question': 'Quel projet ?', 'chunk_ids': [other_chunk]})
     assert result.status_code == 400

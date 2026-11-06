@@ -31,11 +31,11 @@ Le projet conserve uniquement **LocalDoc RAG WebNN** :
 | Lancement Windows | `demarrer-webnn.bat` |
 | Adresse | <http://127.0.0.1:8766> |
 | Recherche | MiniLM dans le navigateur via WebNN, associée à une recherche par mots |
-| Réponse | Phi-4 exécuté localement dans Ollama |
+| Réponse | Phi-4 exécuté localement dans llama.cpp |
 
 L'application propose l'import des fichiers, la préparation des passages, les questions, les réponses avec citations et l'ouverture des pages sources.
 
-**L'architecture reste hybride.** WebNN intervient dans la recherche sémantique. Phi-4 génère les réponses dans Ollama sur le même PC. La génération n'est pas exécutée dans le navigateur.
+**L'architecture reste hybride.** WebNN intervient dans la recherche sémantique. Phi-4 génère les réponses dans llama.cpp sur le même PC. La génération n'est pas exécutée dans le navigateur.
 
 Les documents déjà importés sont conservés dans `data/`. Le profil Edge et son cache ont été déplacés dans `web/.edge-profile/` lors du nettoyage du projet.
 
@@ -44,7 +44,7 @@ Les documents déjà importés sont conservés dans `data/`. Le profil Edge et s
 Sur un poste déjà préparé :
 
 - Le dossier complet du projet doit rester accessible en écriture.
-- Ollama doit être installé, lancé et disposer du modèle `phi4`.
+- llama.cpp et Phi-4 doivent être préparés par `installer-webnn.bat`.
 - La version WebNN doit avoir été préparée avec `installer-webnn.bat`.
 - Microsoft Edge doit être installé pour utiliser le lanceur WebNN fourni.
 
@@ -54,7 +54,7 @@ Une carte graphique compatible peut accélérer Phi‑4. L’application peut au
 
 ## 4. Démarrer la version avec recherche WebNN
 
-1. Vérifier qu’Ollama est lancé.
+1. Démarrer avec `demarrer-webnn.bat` : le moteur est chargé automatiquement.
 2. Double-cliquer sur **`demarrer-webnn.bat`**, à la racine du projet.
 3. Attendre l’ouverture de la fenêtre Edge à l’adresse <http://127.0.0.1:8766>.
 4. Vérifier que la zone **Mes documents** apparaît.
@@ -149,9 +149,9 @@ Une demande comme « De qui parle ce document ? » peut identifier son sujet à 
 | Recherche | Préparation éventuelle de l’index, recherche par mots et recherche sémantique jusqu’à la sélection des passages |
 | Réponse | Traitement serveur pour la réponse Phi‑4, pouvant inclure son chargement, la lecture du contexte et la génération |
 
-La première question peut être plus lente : le navigateur initialise son moteur et Ollama peut devoir charger Phi‑4.
+La première question peut être plus lente : le navigateur initialise son moteur et llama.cpp peut devoir charger Phi‑4.
 
-L’application demande à Ollama de conserver Phi‑4 en mémoire pendant 15 minutes après utilisation. Ce délai réduit les rechargements, sans garantir que le modèle restera disponible en toutes circonstances. Une question identique répétée peut aussi bénéficier du cache de contexte d’Ollama.
+Phi-4 reste chargé tant que llama-server fonctionne. Le cache de contexte peut accélérer une question répétée.
 
 ### Mesures locales observées le 5 novembre 2026
 
@@ -184,7 +184,7 @@ Dans **Options de recherche et informations**, les choix proposés sont :
 | WebNN · préférence NPU | Essai sur un matériel compatible ; la réussite ne prouve pas l’utilisation d’un NPU |
 | WASM · CPU du navigateur | Exécution dans le navigateur sans demander WebNN |
 
-Le changement de moteur concerne la recherche des passages. Phi‑4 continue à rédiger dans Ollama.
+Le changement de moteur concerne la recherche des passages. Phi‑4 continue à rédiger dans llama.cpp.
 
 Le type de périphérique demandé est une préférence. Le navigateur choisit l’exécution réelle et ONNX Runtime peut répartir les opérations entre WebNN et du calcul CPU. L’application ne remplace pas silencieusement une API WebNN absente par le mode WASM : ce dernier doit être choisi explicitement.
 
@@ -193,9 +193,9 @@ Le type de périphérique demandé est une préférence. Le navigateur choisit l
 | Symptôme | Première action |
 |---|---|
 | « WebNN n’est pas activé dans ce navigateur » | Fermer l’onglet concerné et rouvrir avec `demarrer-webnn.bat` ; au besoin, sélectionner explicitement WASM dans les options |
-| « Ollama indisponible ou modèle absent » | Vérifier qu’Ollama est lancé et que `ollama list` contient `phi4` |
-| « Installation Ollama incomplète » | Faire réparer ou réinstaller Ollama ; le moteur et ses bibliothèques doivent être présents, pas seulement les modèles |
-| Réponse très lente | Séparer le temps de recherche du temps de réponse ; faire vérifier l’utilisation du GPU avec `ollama ps` |
+| « llama.cpp indisponible » | Relancer `demarrer-webnn.bat` ; consulter `web/.launcher/llama-error.log` |
+| Moteur ou modèle absent | Relancer `installer-webnn.bat` ; vérifier `models/phi4.gguf` |
+| Réponse très lente | Séparer le temps de recherche du temps de réponse ; faire vérifier l’utilisation du GPU avec les journaux llama.cpp et `nvidia-smi` |
 | Aucun texte lisible détecté | Vérifier si le PDF est un scan ; l’application n’intègre pas d’OCR |
 | Une partie du PDF manque | Vérifier les pages sans texte et la qualité de l’extraction ; les tableaux et mises en page complexes peuvent être mal extraits |
 | Mauvaise réponse malgré des citations | Lire les extraits et reformuler une question plus précise ; les citations ne suffisent pas à valider le raisonnement |
@@ -206,9 +206,9 @@ Fermer la fenêtre Edge ne ferme pas le serveur WebNN lancé en arrière-plan. P
 
 ## 12. Données locales et limites de confidentialité
 
-Le code applicatif utilise les services de la machine : navigateur, serveur Python, SQLite et Ollama. Les modèles et leurs fichiers sont téléchargés lors de l’installation initiale. Le projet n’intègre pas de service d’analyse d’audience ni de CDN pour les fichiers de l’interface compilée.
+Le code applicatif utilise les services de la machine : navigateur, serveur Python, SQLite et llama.cpp. Les modèles et leurs fichiers sont téléchargés lors de l’installation initiale. Le projet n’intègre pas de service d’analyse d’audience ni de CDN pour les fichiers de l’interface compilée.
 
-Cela ne constitue pas une homologation de sécurité. Les documents et les passages sont conservés sur disque sans chiffrement applicatif. Il n’y a ni compte utilisateur, ni cloisonnement par personne, ni contrôle d’accès applicatif. Le navigateur possède également son propre cache de vecteurs. Les politiques du poste, du navigateur et d’Ollama restent à vérifier dans un contexte professionnel.
+Cela ne constitue pas une homologation de sécurité. Les documents et les passages sont conservés sur disque sans chiffrement applicatif. Il n’y a ni compte utilisateur, ni cloisonnement par personne, ni contrôle d’accès applicatif. Le navigateur possède également son propre cache de vecteurs. Les politiques du poste, du navigateur et d’llama.cpp restent à vérifier dans un contexte professionnel.
 
 L’application est prévue pour une utilisation locale sur `127.0.0.1`. Un partage réseau ou une exposition sur Internet nécessiterait des protections qui ne sont pas implémentées dans cette version.
 

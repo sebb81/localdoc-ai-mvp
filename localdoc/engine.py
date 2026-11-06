@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.environ.get('LOCALDOC_DATA_DIR', str(ROOT / 'data'))).resolve()
 UPLOADS = DATA_DIR / 'uploads'
 DB_PATH = DATA_DIR / 'localdoc.sqlite3'
-OLLAMA = 'http://127.0.0.1:11434'
+LLAMA_URL = os.environ.get('LOCALDOC_LLAMA_URL', 'http://127.0.0.1:8081').rstrip('/')
 CHAT_MODEL = 'phi4'
 MAX_BYTES = 25 * 1024 * 1024
 MAX_PAGES = 600
@@ -178,8 +178,8 @@ def delete_document(doc_id):
     (UPLOADS / (doc_id + doc['file_ext'])).unlink(missing_ok=True)
 
 
-def ollama_request(endpoint, payload, timeout=120):
-    req = Request(OLLAMA + endpoint, data=json.dumps(payload).encode('utf-8'),
+def llama_request(endpoint, payload, timeout=240):
+    req = Request(LLAMA_URL + endpoint, data=json.dumps(payload).encode('utf-8'),
                   headers={'Content-Type': 'application/json'}, method='POST')
     try:
         with urlopen(req, timeout=timeout) as response:
@@ -187,17 +187,16 @@ def ollama_request(endpoint, payload, timeout=120):
     except HTTPError as exc:
         try:
             detail = json.loads(exc.read()).get('error', str(exc))
+            if isinstance(detail, dict):
+                detail = detail.get('message', str(detail))
         except (ValueError, OSError):
             detail = str(exc)
-        if 'llama-server binary not found' in detail:
-            raise RuntimeError(
-                "Installation Ollama incomplète : llama-server.exe est introuvable. "
-                "Réinstallez Ollama, puis relancez l'application. "
-                "Les modèles et documents déjà téléchargés peuvent être conservés."
-            ) from exc
-        raise RuntimeError(f'Ollama : {detail}') from exc
+        raise RuntimeError(f'llama.cpp : {detail}') from exc
     except (URLError, TimeoutError, OSError) as exc:
-        raise RuntimeError(f'Ollama indisponible ou modèle absent : {exc}') from exc
+        raise RuntimeError(
+            'llama.cpp indisponible. Lancez demarrer-webnn.bat ; '
+            f'consultez web/.launcher/llama-error.log. Détail : {exc}'
+        ) from exc
 
 
 STOP = {'qui', 'que', 'quel', 'quelle', 'quels', 'quelles', 'quoi', 'dans', 'pour',
@@ -241,31 +240,34 @@ def answer_from_sources(question, sources, mode, start=None):
               'Écris les citations entre crochets, par exemple : Réponse [S1]. '
               'Si plusieurs stages ou périodes sont mentionnés, distingue-les explicitement. '
               'Réponds directement à la question en deux ou trois phrases maximum.')
-    output = ollama_request('/api/chat', {
-        'model': CHAT_MODEL, 'stream': False, 'think': False, 'keep_alive': '15m',
+    output = llama_request('/v1/chat/completions', {
+        'model': CHAT_MODEL, 'stream': False,
         'messages': [{'role': 'system', 'content': system},
                      {'role': 'user', 'content': 'Question : ' + question + '\n\nEXTRAITS:\n' + context}],
-        'options': {'temperature': 0, 'num_ctx': 4096, 'num_predict': 480}
+        'temperature': 0, 'max_tokens': 480
     }, timeout=240)
-    answer = output.get('message', {}).get('content', '').strip()
+    choice = next(iter(output.get('choices') or []), {})
+    answer = (choice.get('message', {}).get('content') or '').strip()
     valid = {s['source_id'] for s in sources}
     used = set(re.findall(r'\[(S\d+)\]', answer))
     warning = None
     if not answer:
         answer = "Le modèle local n'a pas produit de réponse. Les passages retrouvés restent consultables ci-dessous."
         warning = ('Génération interrompue : limite de jetons atteinte.'
-                   if output.get('done_reason') == 'length'
+                   if choice.get('finish_reason') == 'length'
                    else 'Échec de génération : réponse vide du modèle local. Réessayez.')
     elif not used:
         warning = 'Réponse sans renvoi explicite aux sources : à vérifier.'
     elif not used <= valid:
         warning = 'Le modèle a référencé une source inexistante : vérifier sa réponse.'
+    timings = output.get('timings') or {}
+    usage = output.get('usage') or {}
     generation_stats = {
-        'load_seconds': round(output.get('load_duration', 0) / 1e9, 3),
-        'prompt_seconds': round(output.get('prompt_eval_duration', 0) / 1e9, 3),
-        'generation_seconds': round(output.get('eval_duration', 0) / 1e9, 3),
-        'prompt_tokens': output.get('prompt_eval_count'),
-        'output_tokens': output.get('eval_count'),
+        'load_seconds': None,
+        'prompt_seconds': round(timings['prompt_ms'] / 1000, 3) if 'prompt_ms' in timings else None,
+        'generation_seconds': round(timings['predicted_ms'] / 1000, 3) if 'predicted_ms' in timings else None,
+        'prompt_tokens': usage.get('prompt_tokens'),
+        'output_tokens': usage.get('completion_tokens'),
     }
     return {'answer': answer, 'sources': sources, 'mode': mode, 'generation_stats': generation_stats,
             'warning': warning, 'elapsed_seconds': round(time.perf_counter()-start, 3)}

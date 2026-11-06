@@ -1,3 +1,5 @@
+> Migration du 6 novembre 2026 : génération avec llama.cpp. Les mesures et captures antérieures restent des preuves historiques Ollama.
+
 ﻿# LocalDoc AI — Documentation technique
 
 **État décrit : 5 novembre 2026 — application 0.2.0**  
@@ -6,7 +8,7 @@
 
 ## 1. Périmètre
 
-Le projet contient une seule application : **LocalDoc RAG WebNN**. Elle permet l'import de documents, la recherche de passages dans le navigateur et la génération de réponses sourcées avec Phi-4 dans Ollama.
+Le projet contient une seule application : **LocalDoc RAG WebNN**. Elle permet l'import de documents, la recherche de passages dans le navigateur et la génération de réponses sourcées avec Phi-4 dans llama.cpp.
 
 Le serveur est `localdoc.main:app`, à l'adresse habituelle `http://127.0.0.1:8766`. Le dossier `web/` contient l'unique interface. Le port 8767 est réservé dans les procédures à une instance de test ou de développement du même serveur, avec un dossier de données distinct : ce n'est pas une seconde version du produit.
 
@@ -28,7 +30,7 @@ flowchart TD
     WORKER --> RRF[Fusion sémantique et lexicale]
     RRF -->|Question et jusqu'à 6 identifiants| API
     API -->|Vérification et relecture des sources| DB
-    API --> O[Ollama local : Phi-4]
+    API --> O[llama.cpp local : Phi-4]
     O --> API
     API -->|Réponse, extraits et pages| UI
 ```
@@ -40,7 +42,7 @@ Le serveur ne fait pas confiance au texte d'un passage transmis par le navigateu
 | Fichier ou dossier | Rôle |
 |---|---|
 | [`localdoc/main.py`](localdoc/main.py) | Unique application FastAPI : documents, recherche lexicale, génération et fichiers statiques |
-| [`localdoc/engine.py`](localdoc/engine.py) | Extraction, découpage, SQLite, FTS5, client Ollama et réponse sourcée |
+| [`localdoc/engine.py`](localdoc/engine.py) | Extraction, découpage, SQLite, FTS5, client llama.cpp et réponse sourcée |
 | [`web/index.html`](web/index.html), [`web/style.css`](web/style.css) | Interface RAG |
 | [`web/rag.js`](web/rag.js) | États de l'interface, appels API, progression et gestion du worker |
 | [`web/rag-worker.js`](web/rag-worker.js) | Indexation, cache IndexedDB, similarité et fusion des classements |
@@ -63,7 +65,7 @@ Les anciens écrans et scripts de diagnostic ne font plus partie de l'applicatio
 
 ### Environnement observé
 
-Poste testé : Windows, Python 3.11.7, Node.js 24.18.1, Ollama 0.40.14, Edge 156, Intel Core i9-13980HX et RTX 4080 Laptop de 12 Go. Phi-4 a été vérifié chargé à `100% GPU` avec `ollama ps` après restauration des bibliothèques CUDA officielles de la version installée.
+Validation historique avant migration llama.cpp : Windows, Python 3.11.7, Node.js 24.18.1, Ollama 0.40.14, Edge 156, Intel Core i9-13980HX et RTX 4080 Laptop de 12 Go. Phi-4 a été vérifié chargé à `100% GPU` avec `ollama ps` après restauration des bibliothèques CUDA officielles de la version installée.
 
 Ce relevé ne constitue pas une configuration minimale validée. Une exécution CPU reste possible avec des délais supérieurs. Vite 7 exige Node compatible, notamment 20.19+ ou 22.12+.
 
@@ -79,7 +81,7 @@ Les dépendances JavaScript sont verrouillées par `web/package-lock.json` et in
 | Paramètre | Valeur |
 |---|---|
 | Dossier documentaire | `<racine>/data` ou `LOCALDOC_DATA_DIR` |
-| Adresse Ollama | `http://127.0.0.1:11434` |
+| Adresse llama.cpp | `http://127.0.0.1:8081` ou `LOCALDOC_LLAMA_URL` |
 | Modèle de génération | `phi4` |
 | Modèle de recherche | MiniLM L6 v2 ONNX, FP32, 384 dimensions |
 | Révision MiniLM | `aff7a1dc4e8a1ea593e6ea21e95c22ef0a25966f` |
@@ -87,17 +89,15 @@ Les dépendances JavaScript sont verrouillées par `web/package-lock.json` et in
 | Limite de sortie | 480 tokens |
 | Température | 0 |
 | Streaming | Désactivé |
-| Raisonnement demandé | `think: false` |
-| Conservation Phi-4 | `keep_alive: '15m'` |
+| Conservation Phi-4 | Pendant la durée de vie de llama-server |
 
-Les constantes Ollama et Phi-4 sont dans `engine.py`. Elles ne sont pas lues automatiquement depuis un `.env`. Définir `LOCALDOC_DATA_DIR` avant le démarrage du serveur ; les chemins sont calculés à l'import du module.
+L’URL llama.cpp et le modèle Phi-4 sont dans `engine.py`. Elles ne sont pas lues automatiquement depuis un `.env`. Définir `LOCALDOC_DATA_DIR` avant le démarrage du serveur ; les chemins sont calculés à l'import du module.
 
 ## 5. Installation sous Windows
 
-Installer Python, Node.js, Microsoft Edge et Ollama. Depuis la racine :
+Installer Python, Node.js et Microsoft Edge. Le script installe llama.cpp/CUDA 12.4 pour Windows x64/NVIDIA. Depuis la racine :
 
 ```powershell
-ollama pull phi4
 .\installer-webnn.bat
 ```
 
@@ -109,7 +109,7 @@ Le script d'installation :
 4. Lance `node prepare.mjs`.
 5. Compile l'interface avec `npm run build`.
 
-Le script n'installe pas Ollama et ne télécharge pas Phi-4. Le modèle Phi-4 représente environ 9,1 Go dans la variante installée sur le poste testé. L'installation initiale nécessite Internet ; les fichiers d'inférence sont ensuite servis localement.
+Le script installe llama.cpp b12110 et ses bibliothèques CUDA officielles, vérifie les empreintes SHA-256 des archives et réutilise le GGUF Phi-4 présent dans le stockage Ollama via un lien NTFS (copie si nécessaire). Sans modèle existant, placer Phi-4 dans `models/phi4.gguf`. Le lancement ne dépend plus du service Ollama. Voir le README pour les variables de configuration.
 
 `prepare.mjs` récupère `model.onnx`, `model.onnx_data`, `tokenizer.json` et `tokenizer_config.json` à la révision figée du dépôt `onnx-community/all-MiniLM-L6-v2-ONNX`, pour environ 91 Mo de modèle. Il copie les fichiers WASM/JSEP du paquet npm dans `public/runtime/` et écrit `provenance.json`.
 
@@ -234,9 +234,9 @@ Il n'y a pas de reranker ni de seuil d'abstention sémantique calibré. Un docum
 
 ## 10. Génération et API
 
-Le corps de génération impose une question de 3 à 1 000 caractères et une liste de 1 à 6 identifiants. Le serveur déduplique les identifiants en préservant leur ordre, puis vérifie qu'ils appartiennent au document demandé. Une source étrangère est rejetée avant tout appel Ollama.
+Le corps de génération impose une question de 3 à 1 000 caractères et une liste de 1 à 6 identifiants. Le serveur déduplique les identifiants en préservant leur ordre, puis vérifie qu'ils appartiennent au document demandé. Une source étrangère est rejetée avant tout appel llama.cpp.
 
-Le contexte est composé des marqueurs `[S1]`, des pages et du texte relu en base. Phi-4 reçoit une consigne de réponse en français à partir des seuls extraits, de citations et de brièveté. L'appel local `/api/chat` utilise `stream: false`, `think: false`, température 0, contexte 4096, sortie maximale 480 et conservation 15 minutes. Le délai réseau est de 240 secondes.
+Le contexte est composé des marqueurs `[S1]`, des pages et du texte relu en base. Phi-4 reçoit une consigne de réponse en français à partir des seuls extraits, de citations et de brièveté. L'appel local `/v1/chat/completions` utilise `stream: false`, température 0 et `max_tokens: 480`. Le lanceur configure le contexte à 4096 et un seul slot. La réponse est lue dans `choices[0].message.content`, les jetons dans `usage` et les durées disponibles dans `timings` (millisecondes). Les durées absentes restent nulles. Le délai réseau est de 240 secondes.
 
 | Méthode | Route | Résultat |
 |---|---|---|
@@ -256,11 +256,11 @@ Exemple d'entrée de génération, avec des identifiants réels à substituer :
 {"question":"Quel est le budget ?","chunk_ids":[123,124]}
 ```
 
-La réponse contient `answer`, `sources`, `mode: rag-webnn-phi4`, `warning`, `elapsed_seconds` et `generation_stats`. Ce dernier détaille `load_seconds`, `prompt_seconds`, `generation_seconds`, `prompt_tokens` et `output_tokens`. Les durées proviennent des mesures Ollama converties de nanosecondes en secondes. L'interface affiche le total de recherche et le total de réponse.
+La réponse contient `answer`, `sources`, `mode: rag-webnn-phi4`, `warning`, `elapsed_seconds` et `generation_stats`. Ce dernier détaille `load_seconds`, `prompt_seconds`, `generation_seconds`, `prompt_tokens` et `output_tokens`. Les durées disponibles proviennent de `timings` llama.cpp, converties de millisecondes en secondes ; les durées absentes et le chargement sont nulls. L'interface affiche le total de recherche et le total de réponse.
 
 Le contrôle de citation repère les marqueurs isolés avec `\[(S\d+)\]`. Il ne vérifie pas toutes les citations groupées, chaque affirmation ni la correspondance sémantique avec la source. Une réponse vide conserve les sources et affiche un message explicatif ; une sortie partielle non vide peut atteindre la limite de tokens sans avertissement spécifique.
 
-Erreurs : `400` pour import invalide ou source étrangère, `404` pour document absent, `422` pour corps non conforme ou certaines erreurs d'extraction, `503` pour erreur Ollama. L'absence de `llama-server.exe` reçoit un message d'installation incomplète. Les erreurs worker sont affichées côté interface. Le statut health ne réalise pas une inférence de contrôle.
+Erreurs : `400` pour import invalide ou source étrangère, `404` pour document absent, `422` pour corps non conforme ou certaines erreurs d'extraction, `503` pour erreur llama.cpp. Le lanceur signale un moteur ou un modèle absent. Les erreurs worker sont affichées côté interface. Le statut health ne réalise pas une inférence de contrôle.
 
 ## 11. Tests
 
@@ -269,7 +269,7 @@ Erreurs : `400` pour import invalide ou source étrangère, `404` pour document 
 .\.venv\Scripts\python.exe -m pytest -q tests
 ```
 
-Après nettoyage, le périmètre WebNN comprend 11 tests Python : extraction et métadonnées, import/déduplication, classement lexical, suppression, appel Phi-4 et citations, réponse vide, diagnostic d'installation Ollama, PDF de plusieurs pages, isolation des sources entre documents et absence des anciennes routes. Les appels Ollama unitaires sont simulés. Un avertissement Starlette/TestClient lié à httpx reste visible dans l'environnement testé.
+Après nettoyage, le périmètre WebNN comprend 12 tests Python : extraction et métadonnées, import/déduplication, classement lexical, suppression, appel Phi-4 et citations, réponse vide, erreurs HTTP et connexion llama.cpp, PDF de plusieurs pages, isolation des sources entre documents et absence des anciennes routes. Les appels llama.cpp unitaires sont simulés. Un avertissement Starlette/TestClient lié à httpx reste visible dans l'environnement testé.
 
 ### Recette réelle Edge + WebNN + Phi-4
 
@@ -288,9 +288,9 @@ cd web
 npm run test:rag
 ```
 
-Le test utilise un PDF entièrement fictif de trois pages. Il contrôle un montant attendu, une citation de page 2, la réutilisation du cache après rechargement, l'absence d'erreur JavaScript et de requête extérieure du navigateur, puis le débordement horizontal mobile. Les résultats sont réécrits dans `web/evidence/rag-webnn-phi4.json` et sa capture associée. Vérifier la date du rapport avant de le citer.
+Le test utilise un PDF entièrement fictif de trois pages. Il contrôle un montant attendu, une citation de page 2, la réutilisation du cache après rechargement, l'absence d'erreur JavaScript et de requête extérieure du navigateur, puis le débordement horizontal mobile. Les résultats sont réécrits dans `web/evidence/rag-webnn-llamacpp.json` et sa capture associée. Vérifier la date du rapport avant de le citer.
 
-Les tests unitaires ne prouvent pas le fonctionnement d'un périphérique réel. Le test navigateur avec Ollama réel ne constitue pas à lui seul une validation métier sur les documents de l'utilisateur.
+Les tests unitaires ne prouvent pas le fonctionnement d'un périphérique réel. Le test navigateur avec un moteur réel ne constitue pas à lui seul une validation métier sur les documents de l'utilisateur.
 
 ## 12. Performances et maintenance
 
@@ -298,23 +298,23 @@ Contrôles :
 
 ```powershell
 Invoke-RestMethod 'http://127.0.0.1:8766/api/health'
-ollama list
-ollama ps
+Invoke-RestMethod 'http://127.0.0.1:8081/health'
+Invoke-RestMethod 'http://127.0.0.1:8081/v1/models'
 nvidia-smi
 ```
 
-`ollama ps` indique les modèles chargés à cet instant et la répartition CPU/GPU. Une liste vide peut correspondre au déchargement après inactivité. La présence d'une carte graphique ne prouve pas que le moteur l'utilise : vérifier aussi l'installation complète d'Ollama et de ses bibliothèques.
+Les journaux `web/.launcher/llama-error.log` indiquent le périphérique CUDA et les couches déportées. Vérifier aussi `nvidia-smi` ; la présence du GPU seule ne prouve pas son utilisation.
 
-Le relevé local conservé dans `data/webnn-performance.json` décrit l'optimisation Phi-4 du 5 novembre 2026 : 50,348 s sur CPU, 15,387 s au premier appel GPU (dont 7,113 s de chargement), puis 2,253 s pour une répétition identique profitant du cache de contexte. Les deux appels GPU comptaient 1349 tokens de contexte ; leurs sorties étaient différentes en longueur. Le classement des sources pouvait différer de l'essai CPU. Ne pas généraliser ces valeurs à toutes les questions ou machines.
+Historique avant migration : le relevé local conservé dans `data/webnn-performance.json` décrit l'optimisation Phi-4 du 5 novembre 2026 : 50,348 s sur CPU, 15,387 s au premier appel GPU (dont 7,113 s de chargement), puis 2,253 s pour une répétition identique profitant du cache de contexte. Les deux appels GPU comptaient 1349 tokens de contexte ; leurs sorties étaient différentes en longueur. Le classement des sources pouvait différer de l'essai CPU. Ne pas généraliser ces valeurs à toutes les questions ou machines.
 
-Trois mécanismes distincts influencent les temps : cache IndexedDB des vecteurs, modèle Phi-4 chargé, cache de contexte Ollama.
+Trois mécanismes distincts influencent les temps : cache IndexedDB des vecteurs, modèle Phi-4 chargé, cache de contexte llama.cpp.
 
 | Journal | Emplacement |
 |---|---|
 | Serveur en arrière-plan | `web/.launcher/server.log`, `server-error.log` |
 | PID | `web/.launcher/server.pid` |
 | Serveur au premier plan | Terminal de lancement |
-| Ollama Windows sur le poste testé | `%LOCALAPPDATA%\Ollama\server.log` |
+| llama.cpp | `web/.launcher/llama.log`, `llama-error.log`, `llama.pid` |
 | Recette navigateur | `web/evidence/` |
 
 Une mise à jour du modèle ou des fenêtres doit faire évoluer `MODEL_KEY` et prévoir la reconstruction des index. Le profil Edge transféré conserve l'origine de production, le port et la clé du modèle ; aucun recalcul systématique n'est imposé par le seul déplacement de dossier.
@@ -323,7 +323,7 @@ Une mise à jour du modèle ou des fenêtres doit faire évoluer `MODEL_KEY` et 
 
 Le serveur est limité à la boucle locale par les lanceurs. Il n'y a pas d'authentification, de contrôle d'accès utilisateur, de chiffrement applicatif au repos ni de cloisonnement multi-utilisateur. Originaux, texte extrait, vecteurs et rapports peuvent contenir des données sensibles.
 
-Le frontend utilise `textContent` pour les textes documentaires ; le serveur vérifie les sources relues. Ces mesures ne constituent pas une protection complète contre les instructions malveillantes présentes dans les documents. Le trafic observé dans une recette navigateur ne représente pas une analyse de tout le trafic système, d'Edge ou d'Ollama.
+Le frontend utilise `textContent` pour les textes documentaires ; le serveur vérifie les sources relues. Ces mesures ne constituent pas une protection complète contre les instructions malveillantes présentes dans les documents. Le trafic observé dans une recette navigateur ne représente pas une analyse de tout le trafic système, d'Edge ou de llama.cpp.
 
 Limites principales :
 
@@ -344,7 +344,18 @@ Les références principales sont le code, les tests et les rapports datés du p
 
 - [ONNX Runtime WebNN](https://onnxruntime.ai/docs/tutorials/web/ep-webnn.html).
 - [Spécification WebNN](https://webmachinelearning.github.io/webnn/).
-- [Ollama : prise en charge matérielle](https://docs.ollama.com/gpu).
+- [llama.cpp : serveur et options](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md).
 - [MiniLM à la révision retenue](https://huggingface.co/onnx-community/all-MiniLM-L6-v2-ONNX/tree/aff7a1dc4e8a1ea593e6ea21e95c22ef0a25966f).
 
 ONNX Runtime est sous licence MIT ; MiniLM retenu et Tokenizers.js sont déclarés sous Apache-2.0 dans les références du projet. Les autres composants conservent leurs licences. Le fichier `LICENSE.txt` demande leur vérification avant distribution ou déploiement en entreprise.
+
+## Validation llama.cpp du 6 novembre 2026
+
+- Moteur officiel b12110, CUDA 12.4 ; archives vérifiées par SHA-256.
+- Phi-4 GGUF existant réutilisé dans `models/phi4.gguf` par lien NTFS.
+- 12 tests Python réussis et compilation Vite réussie.
+- Parcours réel Edge/WebNN + llama.cpp : PDF fictif importé, montant de 48 275 euros correctement répondu avec source page 2 ; aucune erreur JavaScript ni requête externe du navigateur ; cache réutilisé après rechargement et largeur mobile vérifiée.
+- Sur cet essai : recherche 4,1 s et génération/appel serveur 1,023 s (311 jetons en entrée, 35 en sortie). Ce document court ne constitue pas un benchmark comparatif.
+- Le processus `runtime/llamacpp/llama-server.exe` est visible dans `nvidia-smi` ; mémoire GPU totale observée après chargement : 9 680 Mio (inclut les autres processus).
+- Rapport et capture : `web/evidence/rag-webnn-llamacpp.json` et `.png`.
+- Lanceur réel vérifié : `/api/health` expose `generation: llamacpp-local` sur le port 8766. Les documents de l’utilisateur sont conservés ; le test utilise une base isolée.

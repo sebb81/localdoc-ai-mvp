@@ -1,4 +1,4 @@
-"""Unit tests use generated, non-sensitive PDFs. No Ollama/network required."""
+"""Unit tests use generated, non-sensitive PDFs. No llama.cpp/network required."""
 import io
 
 import pytest
@@ -66,21 +66,24 @@ def test_citation_and_local_model_request(monkeypatch):
     def fake(endpoint, payload, timeout=120):
         called.append(endpoint)
         assert payload['model'] == engine.CHAT_MODEL
-        assert payload['think'] is False
+        assert payload['max_tokens'] == 480
+        assert 'options' not in payload
         assert 'EXTRAITS' in payload['messages'][1]['content']
-        return {'message': {'content': 'La migration IPv6 est progressive [S1].'}}
-    monkeypatch.setattr(engine, 'ollama_request', fake)
+        return {'choices': [{'message': {'content': 'La migration IPv6 est progressive [S1].'}}], 'usage': {'prompt_tokens': 90, 'completion_tokens': 12}, 'timings': {'prompt_ms': 250, 'predicted_ms': 500}}
+    monkeypatch.setattr(engine, 'llama_request', fake)
     result = engine.answer_from_sources('Quelle migration est prévue ?',
         [{'source_id': 'S1', 'page': 1, 'text': 'La migration IPv6 est progressive.'}], 'rag-webnn-phi4')
-    assert called == ['/api/chat']
+    assert called == ['/v1/chat/completions']
     assert result['warning'] is None
+    assert result['generation_stats']['prompt_tokens'] == 90
+    assert result['generation_stats']['generation_seconds'] == 0.5
     assert result['sources'][0]['source_id'] == 'S1'
 
 
 def test_empty_generation_keeps_sources_and_explains_failure(monkeypatch):
     doc, _ = engine.add_document(b'Le projet utilise le langage Python.', 'projet.txt')
-    monkeypatch.setattr(engine, 'ollama_request', lambda *a, **kw: {
-        'message': {'content': '', 'thinking': 'internal'}, 'done_reason': 'length'})
+    monkeypatch.setattr(engine, 'llama_request', lambda *a, **kw: {
+        'choices': [{'message': {'content': '', 'reasoning_content': 'internal'}, 'finish_reason': 'length'}]})
     result = engine.answer_from_sources('Quel langage utilise le projet ?', [{'source_id': 'S1', 'page': 1, 'text': 'Le projet utilise le langage Python.'}], 'rag-webnn-phi4')
     assert result['answer']
     assert 'internal' not in result['answer']
@@ -90,16 +93,38 @@ def test_empty_generation_keeps_sources_and_explains_failure(monkeypatch):
 
 
 
-def test_missing_ollama_runtime_has_actionable_error(monkeypatch):
-    from urllib.error import HTTPError
+def test_llama_error_and_connection_failure(monkeypatch):
+    from urllib.error import HTTPError, URLError
     def fail(*args, **kwargs):
-        raise HTTPError('http://127.0.0.1:11434/api/chat', 500, 'Internal Server Error',
-                        {}, io.BytesIO(b'{"error":"llama-server binary not found"}'))
+        raise HTTPError('http://127.0.0.1:8081/v1/chat/completions', 503, 'Unavailable',
+                        {}, io.BytesIO(b'{"error":{"message":"model is loading"}}'))
     monkeypatch.setattr(engine, 'urlopen', fail)
-    with pytest.raises(RuntimeError, match='Installation Ollama incomplète'):
-        engine.ollama_request('/api/chat', {'model': 'phi4'})
+    with pytest.raises(RuntimeError, match='model is loading'):
+        engine.llama_request('/v1/chat/completions', {})
+    def offline(*args, **kwargs):
+        raise URLError('connection refused')
+    monkeypatch.setattr(engine, 'urlopen', offline)
+    with pytest.raises(RuntimeError, match='demarrer-webnn.bat'):
+        engine.llama_request('/v1/chat/completions', {})
 
 
+def test_llama_http_contract(monkeypatch):
+    import json
+    from contextlib import contextmanager
+
+    @contextmanager
+    def respond(request, timeout):
+        assert request.full_url == engine.LLAMA_URL + '/v1/chat/completions'
+        assert request.get_method() == 'POST'
+        assert request.get_header('Content-type') == 'application/json'
+        assert json.loads(request.data)['messages'][0]['content'] == 'Question française'
+        assert timeout == 240
+        yield io.BytesIO(b'{"choices":[{"message":{"content":"OK [S1]"}}]}')
+
+    monkeypatch.setattr(engine, 'urlopen', respond)
+    result = engine.llama_request('/v1/chat/completions', {
+        'messages': [{'role': 'user', 'content': 'Question française'}]})
+    assert result['choices'][0]['message']['content'] == 'OK [S1]'
 
 
 def test_complete_pdf_to_retrieved_page():

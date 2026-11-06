@@ -1,4 +1,4 @@
-"""LocalDoc RAG: WebNN retrieval in the browser, Phi-4 generation in local Ollama."""
+"""LocalDoc RAG: WebNN retrieval in the browser, Phi-4 generation in local llama.cpp."""
 from __future__ import annotations
 
 import asyncio
@@ -71,7 +71,7 @@ class Generation(Question):
 @app.get('/api/health')
 def health():
     return {'application': 'localdoc-rag-webnn', 'chat_model': engine.CHAT_MODEL,
-            'retrieval': 'browser-webnn', 'generation': 'ollama-local'}
+            'retrieval': 'browser-webnn', 'generation': 'llamacpp-local'}
 
 
 @app.get('/api/webnn/documents/{doc_id}/chunks')

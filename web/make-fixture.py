@@ -1,4 +1,4 @@
-"""Generate a fictional, three-page PDF for the real browser/Ollama test."""
+"""Generate a fictional, three-page PDF for the real browser/llama.cpp test."""
 from pathlib import Path
 from reportlab.pdfgen import canvas
 
